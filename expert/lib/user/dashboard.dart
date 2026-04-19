@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'detailProduct.dart';
+import 'notifikasi.dart';
+import 'keranjang.dart';
+import 'order_tab.dart';
+import 'account_tab.dart';
 import '../maps/screens/map_screen.dart'; // ← tambahan import Maps punya Nesya
 
 class DashboardScreen extends StatefulWidget {
@@ -26,10 +30,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
 
-      // ── Kalau tab Maps aktif → tampilkan MapScreen, selain itu dashboard biasa
+      // Render tab sesuai dengan index yang dipilih
       body: _selectedIndex == 1
           ? const MapScreen()
-          : SafeArea(
+          : _selectedIndex == 2
+              ? const OrderTab()
+              : _selectedIndex == 3
+                  ? const AccountTab()
+                  : SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: Column(
@@ -49,12 +57,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   const Spacer(),
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const KeranjangScreen(),
+                        ),
+                      );
+                    },
                     icon: const Icon(Icons.shopping_cart_outlined,
                         color: Colors.black87),
                   ),
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotifikasiScreen(),
+                        ),
+                      );
+                    },
                     icon: const Icon(Icons.notifications_none,
                         color: Colors.black87),
                   ),
@@ -79,51 +101,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              // Banner Placeholder
-              Container(
-                height: 120,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEAF4EC),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          const Expanded(
-                              child: Center(
-                                  child: CircleAvatar(
-                                      radius: 4,
-                                      backgroundColor: Colors.green))),
-                          Container(width: 4, color: Colors.white),
-                          const Expanded(child: SizedBox()),
-                        ],
-                      ),
-                    ),
-                    Container(height: 4, color: Colors.white),
-                    Expanded(
-                      child: Row(
-                        children: [
-                          const Expanded(
-                              child: Center(
-                                  child: CircleAvatar(
-                                      radius: 4,
-                                      backgroundColor: Colors.blue))),
-                          Container(width: 4, color: Colors.white),
-                          Expanded(
-                              child: Center(
-                                  child: CircleAvatar(
-                                      radius: 4,
-                                      backgroundColor:
-                                      Colors.blue.shade800))),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
+
               // Product Grid
               GridView.builder(
                 physics: const NeverScrollableScrollPhysics(),
