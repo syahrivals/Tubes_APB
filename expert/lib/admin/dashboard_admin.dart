@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'catalog_service.dart';
+import 'branch_management_page.dart'; // Pastikan file ini sudah kamu buat
+import 'order_management_page.dart';  // Pastikan file ini sudah kamu buat
 
 class DashboardAdminPage extends StatefulWidget {
   const DashboardAdminPage({super.key});
@@ -11,43 +13,73 @@ class DashboardAdminPage extends StatefulWidget {
 class _DashboardAdminPageState extends State<DashboardAdminPage> {
   int currentIndex = 0;
 
+  // Daftar halaman untuk navigasi bawah (Bottom Navigation)
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      // Index 0: Tampilan Katalog (Layanan & Cabang)
+      _buildKatalogView(),
+      // Index 1: Tampilan Pesanan
+      const OrderManagementPage(),
+      // Index 2: Tampilan Profil (Placeholder sementara)
+      const Center(child: Text('Halaman Profil Belum Dibuat')),
+    ];
+  }
+
+  // Widget khusus untuk tampilan Katalog (Beranda awal)
+  Widget _buildKatalogView() {
+    return SafeArea(
+      child: Column(
+        children: [
+          const CustomHeader(title: 'Katalog'),
+          const SizedBox(height: 28),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Column(
+              children: [
+                MenuCard(
+                  icon: Icons.design_services_outlined,
+                  title: 'Layanan',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const CatalogServicePage(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 18),
+                MenuCard(
+                  icon: Icons.location_on_outlined,
+                  title: 'Cabang',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const BranchManagementPage(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
-      body: SafeArea(
-        child: Column(
-          children: [
-            const CustomHeader(title: 'Katalog'),
-            const SizedBox(height: 28),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              child: Column(
-                children: [
-                  MenuCard(
-                    icon: Icons.design_services_outlined,
-                    title: 'Layanan',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const CatalogServicePage(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 18),
-                  const MenuCard(
-                    icon: Icons.location_on_outlined,
-                    title: 'Cabang',
-                  ),
-                ],
-              ),
-            ),
-            const Spacer(),
-          ],
-        ),
-      ),
+      // Body akan berubah sesuai dengan tab navigasi bawah yang diklik
+      body: _pages[currentIndex],
       bottomNavigationBar: AppBottomNav(
         currentIndex: currentIndex,
         onTap: (index) {
