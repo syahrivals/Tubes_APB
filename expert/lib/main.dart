@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'user/dashboard.dart';
+import 'admin/dashboard_admin.dart';
 
 void main() {
   runApp(const MyApp());
@@ -18,6 +19,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const DashboardScreen(),
+      routes: {'/admin-dashboard': (context) => const DashboardAdminPage()},
     );
   }
 }
