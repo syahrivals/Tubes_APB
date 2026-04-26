@@ -1,96 +1,103 @@
 import 'package:flutter/material.dart';
 import 'catalog_service.dart';
-import 'branch_management_page.dart'; // Pastikan file ini sudah kamu buat
-import 'order_management_page.dart';  // Pastikan file ini sudah kamu buat
+import 'branch_management_page.dart';
+import 'order_management_page.dart';
+import '../auth/splash_screen.dart';
 
-class DashboardAdminPage extends StatefulWidget {
+class DashboardAdminPage extends StatelessWidget {
   const DashboardAdminPage({super.key});
-
-  @override
-  State<DashboardAdminPage> createState() => _DashboardAdminPageState();
-}
-
-class _DashboardAdminPageState extends State<DashboardAdminPage> {
-  int currentIndex = 0;
-
-  // Daftar halaman untuk navigasi bawah (Bottom Navigation)
-  late final List<Widget> _pages;
-
-  @override
-  void initState() {
-    super.initState();
-    _pages = [
-      // Index 0: Tampilan Katalog (Layanan & Cabang)
-      _buildKatalogView(),
-      // Index 1: Tampilan Pesanan
-      const OrderManagementPage(),
-      // Index 2: Tampilan Profil (Placeholder sementara)
-      const Center(child: Text('Halaman Profil Belum Dibuat')),
-    ];
-  }
-
-  // Widget khusus untuk tampilan Katalog (Beranda awal)
-  Widget _buildKatalogView() {
-    return SafeArea(
-      child: Column(
-        children: [
-          const CustomHeader(title: 'Katalog'),
-          const SizedBox(height: 28),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            child: Column(
-              children: [
-                MenuCard(
-                  icon: Icons.design_services_outlined,
-                  title: 'Layanan',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const CatalogServicePage(),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 18),
-                MenuCard(
-                  icon: Icons.location_on_outlined,
-                  title: 'Cabang',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const BranchManagementPage(),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          const Spacer(),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
-      // Body akan berubah sesuai dengan tab navigasi bawah yang diklik
-      body: _pages[currentIndex],
-      bottomNavigationBar: AppBottomNav(
-        currentIndex: currentIndex,
-        onTap: (index) {
-          setState(() {
-            currentIndex = index;
-          });
-        },
+      body: SafeArea(
+        child: Column(
+          children: [
+            const CustomHeader(title: 'Dashboard Admin'),
+            const SizedBox(height: 28),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Column(
+                  children: [
+                    MenuCard(
+                      icon: Icons.design_services_outlined,
+                      title: 'Layanan',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const CatalogServicePage()),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                    MenuCard(
+                      icon: Icons.location_on_outlined,
+                      title: 'Cabang',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const BranchManagementPage()),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                    MenuCard(
+                      icon: Icons.check_box_outlined,
+                      title: 'Pesanan',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const OrderManagementPage()),
+                        );
+                      },
+                    ),
+                    const Spacer(),
+                    // Tombol Logout
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const SplashScreen()),
+                              (route) => false,
+                            );
+                          },
+                          icon: const Icon(Icons.logout, size: 18),
+                          label: const Text('Logout',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.text,
+                            side: const BorderSide(color: AppColors.border),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHARED WIDGETS — dipakai oleh admin pages lain
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class AppColors {
   static const primary = Color(0xFF2848C7);
@@ -221,70 +228,6 @@ class MenuCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class AppBottomNav extends StatelessWidget {
-  final int currentIndex;
-  final ValueChanged<int> onTap;
-
-  const AppBottomNav({
-    super.key,
-    required this.currentIndex,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final items = [
-      (Icons.grid_view_rounded, 'Katalog'),
-      (Icons.check_box_outlined, 'Pesanan'),
-      (Icons.person_outline, 'Profil'),
-    ];
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      decoration: const BoxDecoration(
-        color: Color(0xFFD8DFFD),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: List.generate(items.length, (index) {
-          final selected = currentIndex == index;
-          return InkWell(
-            onTap: () => onTap(index),
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? const Color(0xFFB7C5FF)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(items[index].$1, color: AppColors.primary),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    items[index].$2,
-                    style: const TextStyle(fontSize: 12, color: AppColors.text),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
       ),
     );
   }

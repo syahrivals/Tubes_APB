@@ -1,7 +1,83 @@
 import 'package:flutter/material.dart';
+import '../data/database_helper.dart';
+import '../data/models.dart';
 
-class RegisterScreen extends StatelessWidget {
+class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
+
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> _register() async {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
+    final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      _showError('Mohon lengkapi nama, email, dan password.');
+      return;
+    }
+
+    if (password != confirmPassword) {
+      _showError('Password dan konfirmasi tidak cocok.');
+      return;
+    }
+
+    if (password.length < 4) {
+      _showError('Password minimal 4 karakter.');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final db = DatabaseHelper();
+
+      // Cek apakah email sudah terdaftar
+      if (await db.emailExists(email)) {
+        if (mounted) _showError('Email sudah terdaftar. Silakan login.');
+        return;
+      }
+
+      // Insert user baru
+      await db.insertUser(UserModel(
+        name: name,
+        email: email,
+        password: password,
+        phone: phone,
+      ));
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Akun berhasil dibuat! Silakan login.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      _showError('Gagal mendaftar. Coba lagi.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,16 +101,20 @@ class RegisterScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 40),
-                _inputField('Email'),
-                const SizedBox(height: 20),
-                _inputField('Password', isPassword: true),
-                const SizedBox(height: 20),
-                _inputField('Confirm Password', isPassword: true),
+                _inputField('Nama Lengkap', controller: _nameController),
+                const SizedBox(height: 16),
+                _inputField('Email', controller: _emailController),
+                const SizedBox(height: 16),
+                _inputField('Nomor Telepon', controller: _phoneController),
+                const SizedBox(height: 16),
+                _inputField('Password',
+                    controller: _passwordController, isPassword: true),
+                const SizedBox(height: 16),
+                _inputField('Confirm Password',
+                    controller: _confirmPasswordController, isPassword: true),
                 const SizedBox(height: 40),
                 ElevatedButton(
-                  onPressed: () {
-                    // Action sign up
-                  },
+                  onPressed: _isLoading ? null : _register,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2E4CB9),
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -42,34 +122,28 @@ class RegisterScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: const Text('Sign up', style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : const Text('Sign up',
+                          style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 25),
                 Center(
                   child: GestureDetector(
-                    onTap: () {
-                      Navigator.pop(context);
-                    },
+                    onTap: () => Navigator.pop(context),
                     child: const Text(
                       'Already have an account',
-                      style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600, color: Colors.black87),
                     ),
                   ),
-                ),
-                const SizedBox(height: 40),
-                const Center(
-                  child: Text('Or continue with', style: TextStyle(color: Color(0xFF2E4CB9), fontWeight: FontWeight.bold, fontSize: 13)),
-                ),
-                const SizedBox(height: 15),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _socialIcon(Icons.g_mobiledata, size: 35),
-                    const SizedBox(width: 15),
-                    _socialIcon(Icons.facebook, size: 24),
-                    const SizedBox(width: 15),
-                    _socialIcon(Icons.apple, size: 24),
-                  ],
                 ),
               ],
             ),
@@ -79,8 +153,11 @@ class RegisterScreen extends StatelessWidget {
     );
   }
 
-  Widget _inputField(String hintText, {bool isPassword = false}) {
+  Widget _inputField(String hintText,
+      {bool isPassword = false,
+      required TextEditingController controller}) {
     return TextField(
+      controller: controller,
       obscureText: isPassword,
       decoration: InputDecoration(
         hintText: hintText,
@@ -89,26 +166,15 @@ class RegisterScreen extends StatelessWidget {
         fillColor: Colors.blue.shade50,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: hintText == 'Email' ? Colors.blue.shade200 : Colors.transparent, width: hintText == 'Email' ? 1.5 : 0),
+          borderSide: BorderSide(
+              color: Colors.blue.shade200, width: 1.5),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: hintText == 'Email' ? Colors.blue.shade200 : Colors.transparent, width: hintText == 'Email' ? 1.5 : 0),
+          borderSide: BorderSide(
+              color: Colors.blue.shade200, width: 1.5),
         ),
       ),
-    );
-  }
-
-  Widget _socialIcon(IconData icon, {double size = 24}) {
-    return Container(
-      width: 50,
-      height: 50,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        shape: BoxShape.rectangle,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Center(child: Icon(icon, color: Colors.black87, size: size)),
     );
   }
 }

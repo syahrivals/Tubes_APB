@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'register_screen.dart';
 import '../user/dashboard.dart';
 import '../admin/dashboard_admin.dart';
+import '../data/database_helper.dart';
+import '../data/models.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,28 +15,54 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
 
-  void _loginInfo() {
+  Future<void> _loginInfo() async {
     final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
 
-    if (email == 'admin') {
+    if (email.isEmpty || password.isEmpty) {
+      _showError('Mohon isi email dan password.');
+      return;
+    }
+
+    // Admin login — hardcoded
+    if (email == 'admin' && password == 'password') {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const DashboardAdminPage()),
       );
-    } else if (email == 'user') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const DashboardScreen()),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gunakan akun dummy: email "user" atau "admin" lalu sembarang / kosongkan password.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      return;
     }
+
+    // User login — dari database
+    setState(() => _isLoading = true);
+    try {
+      final db = DatabaseHelper();
+      final user = await db.getUserByEmailAndPassword(email, password);
+
+      if (!mounted) return;
+
+      if (user != null) {
+        SessionManager.login(user);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardScreen()),
+        );
+      } else {
+        _showError('Email atau password salah.');
+      }
+    } catch (e) {
+      _showError('Terjadi kesalahan. Coba lagi.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
   }
 
   @override
@@ -62,7 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: _emailController,
                   decoration: InputDecoration(
-                    hintText: 'Email (Ketik "user" / "admin")',
+                    hintText: 'Email',
                     hintStyle: const TextStyle(color: Colors.black54),
                     filled: true,
                     fillColor: Colors.blue.shade50,
@@ -95,21 +123,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 15),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    'Forgot your password?',
-                    style: TextStyle(
-                      color: Colors.blue.shade700,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 30),
                 ElevatedButton(
-                  onPressed: _loginInfo,
+                  onPressed: _isLoading ? null : _loginInfo,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2E4CB9),
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -117,53 +133,39 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: const Text('Sign in', style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : const Text('Sign in',
+                          style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 25),
                 Center(
                   child: GestureDetector(
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen()));
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const RegisterScreen()));
                     },
                     child: const Text(
                       'Create new account',
-                      style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600, color: Colors.black87),
                     ),
                   ),
-                ),
-                const SizedBox(height: 40),
-                const Center(
-                  child: Text('Or continue with', style: TextStyle(color: Color(0xFF2E4CB9), fontWeight: FontWeight.bold, fontSize: 13)),
-                ),
-                const SizedBox(height: 15),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _socialIcon(Icons.g_mobiledata, size: 35),
-                    const SizedBox(width: 15),
-                    _socialIcon(Icons.facebook, size: 24),
-                    const SizedBox(width: 15),
-                    _socialIcon(Icons.apple, size: 24),
-                  ],
                 ),
               ],
             ),
           ),
         ),
       ),
-    );
-  }
-
-  Widget _socialIcon(IconData icon, {double size = 24}) {
-    return Container(
-      width: 50,
-      height: 50,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        shape: BoxShape.rectangle,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Center(child: Icon(icon, color: Colors.black87, size: size)),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'pilih_cabang.dart';
-
+import '../data/database_helper.dart';
+import '../data/models.dart';
 
 class KeranjangScreen extends StatefulWidget {
   const KeranjangScreen({super.key});
@@ -10,106 +11,152 @@ class KeranjangScreen extends StatefulWidget {
 }
 
 class _KeranjangScreenState extends State<KeranjangScreen> {
-  bool isChecked = false;
+  final DatabaseHelper _db = DatabaseHelper();
+  List<CartItemModel> _items = [];
+  final Set<int> _selectedIds = {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCart();
+  }
+
+  Future<void> _loadCart() async {
+    if (SessionManager.currentUserId == null) return;
+    final items = await _db.getCartItems(SessionManager.currentUserId!);
+    if (mounted) setState(() { _items = items; _loading = false; });
+  }
+
+  int get _totalHarga {
+    return _items
+        .where((item) => _selectedIds.contains(item.id))
+        .fold(0, (sum, item) => sum + item.totalPrice);
+  }
+
+  Future<void> _deleteItem(CartItemModel item) async {
+    await _db.deleteCartItem(item.id!);
+    _selectedIds.remove(item.id);
+    _loadCart();
+  }
+
+  void _checkout() {
+    if (_selectedIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih minimal 1 item untuk checkout.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final selectedItems = _items.where((item) => _selectedIds.contains(item.id)).toList();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => PilihCabangScreen(
+        cartItems: selectedItems,
+        totalHarga: _totalHarga,
+      )),
+    ).then((_) => _loadCart()); // Refresh setelah checkout
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 18),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-        title: const Text(
-          'Keranjang',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        centerTitle: false,
-        titleSpacing: 0,
+        backgroundColor: const Color(0xFF2E4CB9),
+        foregroundColor: Colors.white,
+        title: const Text('Keranjang'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  isChecked = !isChecked;
-                });
-              },
-              child: Container(
-                margin: const EdgeInsets.only(right: 15),
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isChecked ? Colors.blue : Colors.grey.shade400,
-                    width: 1.5,
-                  ),
-                  color: isChecked ? Colors.blue : Colors.transparent,
-                ),
-                child: isChecked ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
-              ),
-            ),
-            // Cart Card
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Colors.grey.shade300,
-                    width: 1.5,
-                  ),
-                ),
-                child: Row(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _items.isEmpty
+              ? const Center(child: Text('Keranjang kosong.\nTambahkan layanan dari dashboard.',
+                  textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)))
+              : Column(
                   children: [
-                    // Dummy Image Container
-                    Container(
-                      width: 65,
-                      height: 65,
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade100, // Background color matching the booklet vibes
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.image, color: Colors.white70, size: 30),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _items.length,
+                        itemBuilder: (context, index) {
+                          final item = _items[index];
+                          final isSelected = _selectedIds.contains(item.id);
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: isSelected ? const Color(0xFF2E4CB9) : Colors.grey.shade200, width: isSelected ? 2 : 1),
+                            ),
+                            child: Row(
+                              children: [
+                                Checkbox(
+                                  value: isSelected,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      if (val == true) {
+                                        _selectedIds.add(item.id!);
+                                      } else {
+                                        _selectedIds.remove(item.id!);
+                                      }
+                                    });
+                                  },
+                                  activeColor: const Color(0xFF2E4CB9),
+                                ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(item.serviceName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 2),
+                                      Text('Ukuran: ${item.size}  ·  Qty: ${item.quantity}', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                      if (item.filePath != null)
+                                        Text('File: ${item.filePath!.split('/').last}', style: TextStyle(fontSize: 11, color: Colors.grey[500]), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      const SizedBox(height: 4),
+                                      Text('Rp ${item.totalPrice}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E4CB9))),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                  onPressed: () => _deleteItem(item),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    // Bottom bar
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 10, offset: const Offset(0, -4))],
+                      ),
+                      child: Row(
                         children: [
-                          const Text(
-                            'Booklet',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${_selectedIds.length} item dipilih', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                Text('Rp $_totalHarga', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2E4CB9))),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'File : abcde.pdf\nUkuran : A4\nQTY : 10',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.black87,
-                              fontWeight: FontWeight.w500,
-                              height: 1.4,
+                          SizedBox(
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: _checkout,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2E4CB9),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: const Text('CHECKOUT', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],
@@ -117,73 +164,6 @@ class _KeranjangScreenState extends State<KeranjangScreen> {
                     ),
                   ],
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.black54,
-                      width: 1.2,
-                    ),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'RP. 120000',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const PilihCabangScreen(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2E4CB9), // Standard bold blue
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'CHECKOUT',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

@@ -30,6 +30,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
   // Jarak tersisa ke cabang
   double _distanceRemaining = 0;
 
+  // Jarak awal (untuk menghitung progress)
+  double _initialDistance = 0;
+
   // Apakah user sudah tiba
   bool _hasArrived = false;
 
@@ -48,6 +51,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   @override
   void dispose() {
     _positionStream?.cancel();
+    _mapController?.dispose();
     super.dispose();
   }
 
@@ -74,6 +78,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
       setState(() {
         _currentPosition = newPos;
         _distanceRemaining = dist;
+        // Simpan jarak awal untuk menghitung progress
+        if (_initialDistance == 0) _initialDistance = dist;
         // Kalau sudah dalam radius 50 meter → dianggap tiba
         _hasArrived = dist < 50;
       });
@@ -273,7 +279,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(2),
                             child: LinearProgressIndicator(
-                              value: 0.35,
+                              value: _initialDistance > 0
+                                  ? (1 - (_distanceRemaining / _initialDistance)).clamp(0.0, 1.0)
+                                  : 0.0,
                               backgroundColor: Colors.grey[200],
                               valueColor: const AlwaysStoppedAnimation<Color>(
                                   Color(0xFF3B4BC8)),

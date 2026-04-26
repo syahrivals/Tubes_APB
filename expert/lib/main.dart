@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'user/dashboard.dart';
-import 'admin/dashboard_admin.dart';
 import 'auth/splash_screen.dart';
 
 
@@ -21,7 +19,6 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const SplashScreen(),
-      routes: {'/admin-dashboard': (context) => const DashboardAdminPage()},
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/branch.dart';
 import 'navigation_screen.dart';
@@ -31,6 +32,39 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> {
         infoWindow: InfoWindow(title: widget.branch.name),
       ),
     };
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
+  }
+
+  // Hitung jarak dari user ke cabang
+  String _getDistanceText() {
+    if (widget.userPosition == null) return '–';
+    double meters = Geolocator.distanceBetween(
+      widget.userPosition!.latitude,
+      widget.userPosition!.longitude,
+      widget.branch.latitude,
+      widget.branch.longitude,
+    );
+    double km = meters / 1000;
+    return '${km.toStringAsFixed(1)} km';
+  }
+
+  // Estimasi waktu tempuh (asumsi 30 km/jam)
+  String _getEtaText() {
+    if (widget.userPosition == null) return '–';
+    double meters = Geolocator.distanceBetween(
+      widget.userPosition!.latitude,
+      widget.userPosition!.longitude,
+      widget.branch.latitude,
+      widget.branch.longitude,
+    );
+    int minutes = (meters / 1000 / 30 * 60).round();
+    if (minutes < 1) return '< 1 mnt';
+    return '~$minutes mnt';
   }
 
   // ── Buka Google Maps eksternal untuk navigasi ──────────────────────────────
@@ -130,8 +164,8 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey.shade200),
                       ),
-                      child: const Text(
-                        '↑ 0.8 km · ~5 mnt',
+                      child: Text(
+                        '↑ ${_getDistanceText()} · ${_getEtaText()}',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -198,8 +232,8 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> {
                                   ? const Color(0xFF16A34A)
                                   : const Color(0xFFC0144A),
                             ),
-                            const _Chip(
-                              label: '0.8 km',
+                            _Chip(
+                              label: _getDistanceText(),
                               color: Color(0xFFE8EAFF),
                               textColor: Color(0xFF2A38A0),
                             ),

@@ -1,91 +1,130 @@
 import 'package:flutter/material.dart';
 import 'order_detail.dart';
+import '../data/database_helper.dart';
+import '../data/models.dart';
 
-class OrderTab extends StatelessWidget {
+class OrderTab extends StatefulWidget {
   const OrderTab({super.key});
+
+  @override
+  State<OrderTab> createState() => _OrderTabState();
+}
+
+class _OrderTabState extends State<OrderTab> {
+  final DatabaseHelper _db = DatabaseHelper();
+  List<OrderModel> _orders = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrders();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadOrders();
+  }
+
+  Future<void> _loadOrders() async {
+    if (SessionManager.currentUserId == null) return;
+    final data = await _db.getOrdersByUser(SessionManager.currentUserId!);
+    if (mounted) setState(() { _orders = data; _loading = false; });
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'Pending': return const Color(0xFFFF9800);
+      case 'Sedang Dicetak': return const Color(0xFF2196F3);
+      case 'Siap Diambil': return const Color(0xFF4CAF50);
+      default: return Colors.grey;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300, width: 1.5),
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: Color(0xFF2E4CB9),
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(20),
+                bottomRight: Radius.circular(20),
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Order # 1',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.green,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    'Bisa di pickup',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        minimumSize: const Size(0, 32),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20)),
-                        elevation: 0,
+            child: const Text('Pesanan Saya', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _orders.isEmpty
+                    ? const Center(child: Text('Belum ada pesanan.\nCheckout dari keranjang untuk membuat pesanan.',
+                        textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)))
+                    : RefreshIndicator(
+                        onRefresh: _loadOrders,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _orders.length,
+                          itemBuilder: (context, index) {
+                            final order = _orders[index];
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(order.orderId, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: _getStatusColor(order.status).withAlpha(30),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(order.status, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _getStatusColor(order.status))),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text('Cabang: ${order.branchName}', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                  Text('Total: Rp ${order.totalPrice}', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                  const SizedBox(height: 10),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton(
+                                      onPressed: () async {
+                                        await Navigator.push(context, MaterialPageRoute(
+                                          builder: (_) => OrderDetailScreen(order: order),
+                                        ));
+                                        _loadOrders();
+                                      },
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(color: Colors.grey.shade300),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                      child: const Text('Detail', style: TextStyle(fontWeight: FontWeight.w600)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                      child: const Text('Lihat Lokasi',
-                          style: TextStyle(color: Colors.white, fontSize: 12)),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) =>
-                                    const OrderDetailScreen()));
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey.shade300,
-                        foregroundColor: Colors.black,
-                        minimumSize: const Size(0, 32),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20)),
-                        elevation: 0,
-                      ),
-                      child: const Text('Detail',
-                          style: TextStyle(fontSize: 12, color: Colors.white)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          )
+          ),
         ],
       ),
     );

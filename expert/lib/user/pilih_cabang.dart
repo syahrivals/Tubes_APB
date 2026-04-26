@@ -1,190 +1,205 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import '../data/database_helper.dart';
+import '../data/models.dart';
 
 class PilihCabangScreen extends StatefulWidget {
-  const PilihCabangScreen({super.key});
+  final List<CartItemModel> cartItems;
+  final int totalHarga;
+
+  const PilihCabangScreen({
+    super.key,
+    required this.cartItems,
+    required this.totalHarga,
+  });
 
   @override
   State<PilihCabangScreen> createState() => _PilihCabangScreenState();
 }
 
 class _PilihCabangScreenState extends State<PilihCabangScreen> {
-  int _selectedIndex = -1;
+  final DatabaseHelper _db = DatabaseHelper();
+  List<BranchModel> _branches = [];
+  int? _selectedBranchId;
+  bool _loading = true;
+  bool _processing = false;
 
-  final List<Map<String, String>> _branches = [
-    {
-      'name': 'Cab. Utama - Dago',
-      'address': 'Jl. Ir. H. Juanda No. 12 . 0.8 km',
-    },
-    {
-      'name': 'Cab. Timur - Antapani',
-      'address': 'Jl. Antapani Raya . 2.1 km',
-    },
-    {
-      'name': 'Cab Barat - Cimahi',
-      'address': 'Jl. Cihanjuang . 4.3 km',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadBranches();
+  }
+
+  Future<void> _loadBranches() async {
+    final data = await _db.getAllBranches();
+    if (mounted) setState(() { _branches = data; _loading = false; });
+  }
+
+  Future<void> _checkout() async {
+    if (_selectedBranchId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih cabang terlebih dahulu.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    setState(() => _processing = true);
+
+    try {
+      final selectedBranch = _branches.firstWhere((b) => b.id == _selectedBranchId);
+
+      // Generate random order ID
+      final uuid = const Uuid();
+      final orderId = '#ORD-${uuid.v4().substring(0, 5).toUpperCase()}';
+
+      // Create order
+      final order = OrderModel(
+        orderId: orderId,
+        userId: SessionManager.currentUserId!,
+        branchId: _selectedBranchId!,
+        branchName: selectedBranch.name,
+        status: 'Pending',
+        totalPrice: widget.totalHarga,
+        createdAt: DateTime.now().toIso8601String(),
+      );
+
+      // Create order items from cart items
+      final orderItems = widget.cartItems.map((cart) => OrderItemModel(
+        orderId: orderId,
+        serviceId: cart.serviceId,
+        serviceName: cart.serviceName,
+        quantity: cart.quantity,
+        size: cart.size,
+        filePath: cart.filePath,
+        price: cart.totalPrice,
+      )).toList();
+
+      // Insert order + items to DB
+      await _db.insertOrder(order, orderItems);
+
+      // Delete checked out cart items
+      await _db.deleteCartItemsByIds(
+        widget.cartItems.map((e) => e.id!).toList(),
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Pesanan $orderId berhasil dibuat!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Navigate back to dashboard
+      Navigator.popUntil(context, (route) => route.isFirst);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal checkout: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _processing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 18),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-        title: const Text(
-          'Pilih Cabang',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        centerTitle: false,
-        titleSpacing: 0,
+        backgroundColor: const Color(0xFF2E4CB9),
+        foregroundColor: Colors.white,
+        title: const Text('Pilih Cabang'),
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        itemCount: _branches.length,
-        itemBuilder: (context, index) {
-          final isSelected = _selectedIndex == index;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 15),
-            child: Row(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedIndex = index;
-                    });
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 15),
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isSelected ? Colors.blue : Colors.grey.shade400,
-                        width: 1.5,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _branches.isEmpty
+              ? const Center(child: Text('Belum ada cabang tersedia.', style: TextStyle(color: Colors.grey)))
+              : Column(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _branches.length,
+                        itemBuilder: (context, index) {
+                          final branch = _branches[index];
+                          final isSelected = _selectedBranchId == branch.id;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: isSelected ? const Color(0xFF2E4CB9) : Colors.grey.shade200, width: isSelected ? 2 : 1),
+                            ),
+                            child: RadioListTile<int>(
+                              value: branch.id!,
+                              groupValue: _selectedBranchId,
+                              onChanged: branch.isOpen ? (val) => setState(() => _selectedBranchId = val) : null,
+                              title: Text(branch.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(branch.address, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: branch.isOpen ? const Color(0xFFDCFCE7) : const Color(0xFFFFE4EE),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      branch.isOpen ? 'Buka · ${branch.openHours}' : 'Tutup',
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold,
+                                        color: branch.isOpen ? const Color(0xFF16A34A) : const Color(0xFFC0144A)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              activeColor: const Color(0xFF2E4CB9),
+                            ),
+                          );
+                        },
                       ),
-                      color: isSelected ? Colors.blue : Colors.transparent,
                     ),
-                    child: isSelected ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
-                  ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedIndex = index;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                    // Bottom bar
+                    Container(
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isSelected ? Colors.blue : Colors.grey.shade300,
-                          width: isSelected ? 1.5 : 1,
-                        ),
+                        boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 10, offset: const Offset(0, -4))],
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.store,
-                            color: isSelected ? Colors.blue : Colors.grey.shade600,
-                            size: 28,
-                          ),
-                          const SizedBox(width: 15),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  _branches[index]['name']!,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: isSelected ? Colors.black : Colors.grey.shade400,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _branches[index]['address']!,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isSelected ? Colors.grey.shade700 : Colors.grey.shade400,
-                                  ),
-                                ),
+                                Text('${widget.cartItems.length} item', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                Text('Rp ${widget.totalHarga}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2E4CB9))),
                               ],
+                            ),
+                          ),
+                          SizedBox(
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: _processing ? null : _checkout,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2E4CB9),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: _processing
+                                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                  : const Text('CHECKOUT', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          );
-        },
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: () {
-                if (_selectedIndex == -1) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Silakan pilih cabang terlebih dahulu'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Pesanan berhasil dibuat'),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-                // Kembali ke Dashboard (route pertama)
-                Navigator.popUntil(context, (route) => route.isFirst);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E4CB9),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                'CHECKOUT',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
