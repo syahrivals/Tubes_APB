@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs access to location for maps functionality.</string>
+	<key>API_KEY</key>
+	<string>YOUR_API_KEY</string>
 </dict>
 </plist>
